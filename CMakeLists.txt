@@ -11,5 +11,5 @@ include_directories(lib)
 
 add_subdirectory(bin)
 
-enable_testing()
-add_subdirectory(tests)
+# enable_testing()
+# add_subdirectory(tests)

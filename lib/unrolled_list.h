@@ -21,16 +21,20 @@ public:
 
 private:
     struct sentinel_node {
+        sentinel_node(bool is_s = true) : is_sentinel(is_s) {}
         sentinel_node* next = nullptr;
         sentinel_node* prev = nullptr;
+    private:
+        bool is_sentinel = true;
     };
-    struct node : private sentinel_node {
+    struct node : public sentinel_node {
+        node() : sentinel_node(false) {}
         T data[NodeMaxSize];
         size_t count = 0;
     };
 
-    sentinel_node* begin_ = nullptr;
-    sentinel_node* end_ = nullptr;
+    sentinel_node* begin_;
+    sentinel_node* end_;
     size_t size_ = 0;
 
     template <bool isConst>
@@ -40,20 +44,14 @@ private:
         list_iterator() = default;
         list_iterator(sentinel_node* n, size_t i) : node(n), index(i) {}
 
-        conditional<isConst, const_reference, reference>::type operator*() const { return node->data[index]; }  // *r
+        conditional<isConst, const_reference, reference>::type operator*() const { return node->data[index]; }
         conditional<isConst, const_pointer, pointer>::type operator->() const { return &node->data[index]; }
-        value_type operator*() {  // *r++
-            value_type tmp = **this;
-            ++*this;
-            return tmp;
-        }
 
         list_iterator& operator++() {
-            if (index + 1 == node->count) {
+            if (node->is_sentinel) { return *this; }
+            if (++index == node->count) {
                 index = 0;
                 node = node->next;
-            } else {
-                ++index;
             }
             return *this;
         }
@@ -65,6 +63,9 @@ private:
         bool operator!=(list_iterator& rhs) const {
             if (node != rhs.node) { return false; }
             return index != rhs.index;
+        }
+        bool operator==(list_iterator& rhs) const {
+            return !(*this != rhs);
         }
     private:
         sentinel_node* node;
