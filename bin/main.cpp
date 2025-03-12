@@ -9,5 +9,5 @@ int main(int argc, char** argv) {
 
     unrolled_list<int> list;
     unrolled_list<int>::iterator boo;
-    
+    unrolled_list<int> list2 = unrolled_list<int>();
 }
