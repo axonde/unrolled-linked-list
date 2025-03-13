@@ -24,16 +24,17 @@ public:
 private:
     struct sentinel_node {
         sentinel_node(bool is_s = true) : is_sentinel(is_s) {}
-        std::shared_ptr<sentinel_node> next;
-        std::shared_ptr<sentinel_node> prev;
+        sentinel_node* next;
+        sentinel_node* prev;
         const bool is_sentinel = true;
+        virtual ~sentinel_node() {}
     };
     struct node : public sentinel_node {
         using sentinel_node::next;
         using sentinel_node::prev;
         node() : sentinel_node(false) {}
         node(const node& n) : node() {
-            next = prev = std::shared_ptr<sentinel_node>();
+            next = prev = {};
             data = n.data;
             count = n.count;
         }
@@ -41,9 +42,9 @@ private:
         size_t count = 0;
     };
 
-    std::shared_ptr<sentinel_node> begin_;
-    std::shared_ptr<sentinel_node> end_;
-    size_t size_ = 0;
+    sentinel_node* begin_;
+    sentinel_node* end_;
+    size_type size_ = 0;
 
     template <bool isConst>
     struct list_iterator {
@@ -101,30 +102,47 @@ private:
         size_t index;
     };
 
+    using sentinel_node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<sentinel_node>;
+    sentinel_node_allocator_type sentinel_node_allocator;
+    using node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<node>;
+    node_allocator_type node_allocator;
+
 public:
     using iterator = list_iterator<false>;
     using const_iterator = list_iterator<true>;
 
     unrolled_list() {
-        begin_ = end_ = std::make_shared<sentinel_node>();
+        begin_ = end_ = std::allocator_traits<sentinel_node_allocator_type>::allocate(sentinel_node_allocator, 1);
+        std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, begin_);
+        begin_->prev = begin_->next = end_->prev = end_->next = begin_;
     }
     unrolled_list(const unrolled_list& ul) : unrolled_list() {
-        if (ul.begin_.is_sentinel) { return; }
-        const sentinel_node& other = ul.begin_;
-        begin_.reset(); begin_ = std::make_shared<node>();
-        // begin_->prev = end_;
-        // sentinel_node& curr = begin_;
-        // do {
-        //     curr = ???
-        // }
-        // while (!other.is_sentinel) {
-        //     curr = 
-        //     curr.next = std::make_shared<node>(other);
-        //     curr.next->prev = std::make_shared<node>(&curr);
-        // }
+        if (ul.begin_->is_sentinel) { return; }
+        const sentinel_node* other = ul.begin_;
+        begin_ = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
+        std::allocator_traits<node_allocator_type>::construct(node_allocator, begin_, *other);
+        begin_->prev = end_;
+        sentinel_node* curr;
+        sentinel_node* curr_prev = begin_;
+        while (!other->next->is_sentinel) {
+            curr = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
+            std::allocator_traits<node_allocator_type>::construct(node_allocator, curr, *other->next);
+            curr_prev->next = curr;
+            curr->prev = curr_prev;
+            curr_prev = curr;
+            other = other->next;
+        }
     }
 
     ~unrolled_list() {
-        
+        sentinel_node* del;
+        while (!begin_->is_sentinel) {
+            del = begin_;
+            begin_ = begin_->next;
+            std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, del);
+            std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, del, 1);
+        }
+        std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, end_);
+        std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, end_, 1);
     }
 };
