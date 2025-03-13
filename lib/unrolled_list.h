@@ -54,17 +54,17 @@ private:
         list_iterator(sentinel_node* n, size_t i) : node(n), index(i) {}
 
         conditional<isConst, const_reference, reference>::type operator*() const {
-            if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator");}
-            return node->data[index]; 
+            if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
+            return static_cast<struct node*>(node)->data[index]; 
         }
         conditional<isConst, const_pointer, pointer>::type operator->() const {
             if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator");}
-            return &node->data[index];
+            return &static_cast<struct node*>(node)->data[index];
         }
 
         list_iterator& operator++() {
             if (node->is_sentinel) { throw std::out_of_range("cannot increment the end (rend) iterator"); }
-            if (++index == node->count) {
+            if (++index == static_cast<struct node*>(node)->count) {
                 index = 0;
                 node = node->next;
             }
@@ -80,7 +80,7 @@ private:
             if (node->prev->is_sentinel) { throw std::out_of_range("cannot decrement the begin (rbegin) iterator"); }
             if (index == 0) {
                 node = node->prev;
-                index = node->count - 1;
+                index = static_cast<struct node*>(node)->count - 1;
             }
             return *this;
         }
@@ -90,12 +90,14 @@ private:
             return iter;
         }
 
-        bool operator!=(list_iterator& rhs) const noexcept {
+        bool operator==(const list_iterator& rhs) const noexcept {
             if (node != rhs.node) { return false; }
-            return index != rhs.index;
+            if (node->is_sentinel && rhs.node->is_sentinel) { return true; }
+            if (node->is_sentinel || rhs.node->is_sentinel) { return false; }
+            return index == rhs.index && static_cast<struct node*>(node)->data[index] == static_cast<struct node*>(rhs.node)->data[rhs.index];
         }
-        bool operator==(list_iterator& rhs) const noexcept {
-            return !(*this != rhs);
+        bool operator!=(const list_iterator& rhs) const noexcept {
+            return !(*this == rhs);
         }
     private:
         sentinel_node* node;
@@ -132,6 +134,24 @@ public:
             curr_prev = curr;
             other = other->next;
         }
+    }
+
+    iterator begin() { return {begin_, 0}; }
+    const_iterator cbegin() const { return {begin_, 0}; }
+    iterator end() { return {end_, 0}; }
+    const_iterator cend() const { return {end_, 0}; }
+
+    bool operator==(const unrolled_list& rhs) const {
+        if (size_ != rhs.size_) { return false; }
+        unrolled_list::const_iterator curr_lhs = cbegin();
+        unrolled_list::const_iterator curr_rhs = rhs.cbegin();
+        while (curr_lhs != cend()) {
+            if (*curr_lhs++ != *curr_rhs++) { return false; }
+        }
+        return true;
+    }
+    bool operator!=(const unrolled_list& rhs) {
+        return !(*this == rhs);
     }
 
     ~unrolled_list() {

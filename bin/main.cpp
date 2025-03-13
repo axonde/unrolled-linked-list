@@ -23,5 +23,7 @@ int main(int argc, char** argv) {
     unrolled_list<int, 10, Allocator<int>> list2 = unrolled_list<int, 10, Allocator<int>>();
     unrolled_list<int, 10, Allocator<int>> list3;
     unrolled_list<int, 10, Allocator<int>> list4 = list3;
+    unrolled_list<int, 10, Allocator<int>>& list = list4;
+    std::cout << (list == list4);
     return 0;
 }
