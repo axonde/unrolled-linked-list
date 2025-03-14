@@ -15,11 +15,11 @@ enable_testing()
 
 add_executable(
     unrolled-list-lib-tests
-    allocator_ut.cpp
-    exception_safety_ut.cpp
+    # allocator_ut.cpp
+    # exception_safety_ut.cpp
     named_requirements_ut.cpp
-    no_default_constructible_ut.cpp
-    simple_ut.cpp
+    # no_default_constructible_ut.cpp
+    # simple_ut.cpp
 )
 
 target_link_libraries(

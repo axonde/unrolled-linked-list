@@ -21,6 +21,7 @@ public:
     using const_reference = const T&;
     using difference_type = std::ptrdiff_t;
     using size_type = size_t;
+    using allocator_type = Allocator;
 
 private:
     struct sentinel_node {
@@ -109,6 +110,7 @@ private:
     sentinel_node_allocator_type sentinel_node_allocator;
     using node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<node>;
     node_allocator_type node_allocator;
+    allocator_type allocator;
 
     /// @brief copy to a clear object
     /// @warning be sure, that you copy into a clear object
@@ -139,7 +141,9 @@ public:
         std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, begin_);
         begin_->prev = begin_->next = end_->prev = end_->next = begin_;
     }
+    unrolled_list(const allocator_type& alloc) : unrolled_list(), allocator(alloc) {}
     unrolled_list(const unrolled_list& ul) : unrolled_list() { initialize_copy(ul); }
+    unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul), allocator(alloc) {}
     unrolled_list& operator=(const unrolled_list& rhs) {
         if (this == &rhs) { return *this; }
         clear();
@@ -154,8 +158,10 @@ public:
     }
 
     iterator begin() { return {begin_, 0}; }
+    const_iterator begin() const { return {begin_, 0}; }
     const_iterator cbegin() const { return {begin_, 0}; }
     iterator end() { return {end_, 0}; }
+    const_iterator end() const { return {end_, 0}; }
     const_iterator cend() const { return {end_, 0}; }
 
     bool operator==(const unrolled_list& rhs) const {
@@ -170,14 +176,22 @@ public:
     bool operator!=(const unrolled_list& rhs) const { return !(*this == rhs); }
 
     void swap(unrolled_list& rhs) {
-        unrolled_list tmp(rhs);
-        *this = rhs;
-        rhs = tmp;
+        sentinel_node* t_begin = begin_;
+        sentinel_node* t_end = end_;
+        size_t t_size = size_;
+        begin_ = rhs.begin_;
+        end_ = rhs.end_;
+        size_ = rhs.size_;
+        rhs.begin_ = t_begin;
+        rhs.end_ = t_end;
+        rhs.size_ = t_size;
     }
     inline static void swap(unrolled_list& lhs, unrolled_list& rhs) { lhs.swap(rhs); }
 
     size_type size() const { return size_; }
     size_type max_size() const { return std::allocator_traits<node_allocator_type>::max_size(node_allocator) * NodeMaxSize; }
+
+    allocator_type get_allocator() const { return allocator; }
 
     bool empty() const { return size_ == 0; }
 

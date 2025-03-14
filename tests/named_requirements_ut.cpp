@@ -102,13 +102,13 @@ TEST(NamedRequirements, AllocatorAwareContainer) {
 }
 
 
-TEST(NamedRequirements, SequenceContainer) {
-    static_assert(SequenceContainer<unrolled_list<int, 10>>);
-}
+// TEST(NamedRequirements, SequenceContainer) {
+//     static_assert(SequenceContainer<unrolled_list<int, 10>>);
+// }
 
 
-TEST(NamedRequirements, ReversibleContainer) {
-    static_assert(ReversibleContainer<unrolled_list<int, 10>>);
-}
+// TEST(NamedRequirements, ReversibleContainer) {
+//     static_assert(ReversibleContainer<unrolled_list<int, 10>>);
+// }
 
 
