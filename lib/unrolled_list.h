@@ -4,6 +4,8 @@
 #include <memory>
 #include <stdexcept>
 
+#include <iostream>
+
 template<bool B, class T, class F>
 struct conditional { using type = T; };
  
@@ -12,6 +14,7 @@ struct conditional<false, T, F> { using type = F; };
 
 template<typename T, size_t NodeMaxSize = 10, typename Allocator = std::allocator<T>>
 class unrolled_list {
+    static_assert(NodeMaxSize > 0, "NodeMaxSize must be greater than zero");
 public:
     using value_type = T;
     using reference = T&;
@@ -28,17 +31,11 @@ private:
         sentinel_node* next;
         sentinel_node* prev;
         const bool is_sentinel = true;
-        virtual ~sentinel_node() {}
     };
-    struct node : public sentinel_node {
+    struct node : sentinel_node {
         using sentinel_node::next;
         using sentinel_node::prev;
         node() : sentinel_node(false) {}
-        node(const node& n) : node() {
-            next = prev = {};
-            data = n.data;
-            count = n.count;
-        }
         T data[NodeMaxSize];
         size_t count = 0;
     };
@@ -59,7 +56,7 @@ private:
             return static_cast<struct node*>(node)->data[index]; 
         }
         conditional<isConst, const_pointer, pointer>::type operator->() const {
-            if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator");}
+            if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
             return &static_cast<struct node*>(node)->data[index];
         }
 
@@ -112,36 +109,29 @@ private:
     node_allocator_type node_allocator;
     allocator_type allocator;
 
-    /// @brief copy to a clear object
-    /// @warning be sure, that you copy into a clear object
-    void initialize_copy(const unrolled_list& ul) {  // must to rewrite to simple copy by iterator and insert / push_back
-        if (ul.begin_->is_sentinel) { return; }
-        const sentinel_node* other = ul.begin_;
-        begin_ = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
-        std::allocator_traits<node_allocator_type>::construct(node_allocator, begin_, *other);
-        begin_->prev = end_;
-        sentinel_node* curr;
-        sentinel_node* curr_prev = begin_;
-        while (!other->next->is_sentinel) {
-            curr = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
-            std::allocator_traits<node_allocator_type>::construct(node_allocator, curr, *other->next);
-            curr_prev->next = curr;
-            curr->prev = curr_prev;
-            curr_prev = curr;
-            other = other->next;
+    void initialize_copy(const unrolled_list& ul) {
+        for (auto iter = ul.begin(); iter != ul.end(); ++iter) {
+            this->push_back(*iter);
         }
+    }
+    template<typename ForwardIterator>
+    void initialize_copy(ForwardIterator begin, ForwardIterator end) {
+        while (begin != end) { this->push_back(*begin++); }
     }
 
 public:
     using iterator = list_iterator<false>;
     using const_iterator = list_iterator<true>;
 
-    // TODO: immediately allocate a true node for begin_ -> rewrite logic for other methods. (we allocate only one sentinel_node [for end])
-    // add an assert to node_size, that it must be more than one.
+    /// @brief we allocate to node:  <node [begin]> -- <sentinel_node [end]>
+    /// and we will be always work between begin and end:  <node [begin]> -- {inserting} -- <sentinel_node [end]>
     unrolled_list() {
-        begin_ = end_ = std::allocator_traits<sentinel_node_allocator_type>::allocate(sentinel_node_allocator, 1);
-        std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, begin_);
-        begin_->prev = begin_->next = end_->prev = end_->next = begin_;
+        begin_ = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
+        std::allocator_traits<node_allocator_type>::construct(node_allocator, static_cast<node*>(begin_));
+        end_ = std::allocator_traits<sentinel_node_allocator_type>::allocate(sentinel_node_allocator, 1);
+        std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, end_);
+        begin_->prev = begin_->next = end_->next = end_;
+        end_->prev = begin_;
     }
     unrolled_list(const unrolled_list& ul) : unrolled_list() { initialize_copy(ul); }
     unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul), allocator(alloc) {}
@@ -150,12 +140,8 @@ public:
         for (size_type i = 0; i != n; ++i) { this->push_back(el); }
     }
     template<typename ForwardIterator>
-    unrolled_list(ForwardIterator begin, ForwardIterator end) : unrolled_list() {
-        while (begin != end) { this->push_back(*begin++); }
-    }
-    unrolled_list(std::initializer_list<T> il) : unrolled_list() {
-        for (auto iter = il.begin(); iter != il.end(); ++iter) { this->push_back(*iter); }
-    }
+    unrolled_list(ForwardIterator begin, ForwardIterator end) : unrolled_list() { initialize_copy(begin, end); }
+    unrolled_list(std::initializer_list<T> il) : unrolled_list() { initialize_copy(il.begin(), il.end()); }
     unrolled_list& operator=(const unrolled_list& rhs) {
         if (this == &rhs) { return *this; }
         clear();
@@ -164,11 +150,13 @@ public:
     }
     unrolled_list& operator=(std::initializer_list<T> il) {
         clear();
-        for (auto iter = il.begin(); iter != il.end(); ++iter) { this->push_back(*iter); }
+        initialize_copy(il.begin(), il.end());
     }
 
     ~unrolled_list() {
         clear();
+        std::allocator_traits<node_allocator_type>::destroy(node_allocator, static_cast<node*>(begin_));
+        std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(begin_), 1);
         std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, end_);
         std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, end_, 1);
     }
@@ -211,16 +199,19 @@ public:
 
     bool empty() const { return size_ == 0; }
 
-    void clear() noexcept {  // correct via the new begin / end idiom
+    void clear() noexcept {
         sentinel_node* del;
-        while (!begin_->is_sentinel) {
-            del = begin_;
-            begin_ = begin_->next;
-            std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, del);
-            std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, del, 1);
+        sentinel_node* curr_node = begin_->next;
+        while (!curr_node->is_sentinel) {
+            del = curr_node;
+            curr_node = curr_node->next;
+            std::allocator_traits<node_allocator_type>::destroy(node_allocator, static_cast<node*>(del));
+            std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(del), 1);
         }
         size_ = 0;
-        begin_ = begin_->next = begin_->prev = end_->prev = end_;
+        static_cast<node*>(begin_)->count = 0;
+        begin_->next = end_;
+        end_->prev = begin_;
     }
 
 private:

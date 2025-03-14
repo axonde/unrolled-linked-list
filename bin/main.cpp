@@ -20,15 +20,10 @@ public:
 
 int main(int argc, char** argv) {
     std::cout << "Hello, world!" << std::endl;
-    unrolled_list<int, 10, Allocator<int>> list2 = unrolled_list<int, 10, Allocator<int>>();
-    unrolled_list<int, 10, Allocator<int>> list3;
-    unrolled_list<int, 10, Allocator<int>> list4 = list3;
-    unrolled_list<int, 10, Allocator<int>>& list = list4;
-    list = list3;
-    unrolled_list<int, 10, Allocator<int>>::swap(list, list4);
+    unrolled_list<int, 10, Allocator<int>> list = unrolled_list<int, 10, Allocator<int>>();
     list.clear();
-    std::cout << (list == list4) << ' ' << list.empty() << ' ' << list.max_size() << '\n';
+    // std::cout << (list == list4) << ' ' << list.empty() << ' ' << list.max_size() << '\n';
 
-    unrolled_list<int, 10, Allocator<int>> list5 = {1, 2, 3, 4};
+    // unrolled_list<int, 10, Allocator<int>> list5 = {1, 2, 3, 4};
     return 0;
 }
