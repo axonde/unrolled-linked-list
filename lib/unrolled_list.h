@@ -2,7 +2,6 @@
 #include <compare>
 #include <iterator>
 #include <memory>
-#include <list>
 #include <stdexcept>
 
 template<bool B, class T, class F>
@@ -101,6 +100,7 @@ private:
         bool operator!=(const list_iterator& rhs) const noexcept {
             return !(*this == rhs);
         }
+        friend list_iterator<false> unrolled_list::insert(list_iterator<false> iter, const T& value);
     private:
         sentinel_node* node;
         size_t index;
@@ -114,7 +114,7 @@ private:
 
     /// @brief copy to a clear object
     /// @warning be sure, that you copy into a clear object
-    void initialize_copy(const unrolled_list& ul) {
+    void initialize_copy(const unrolled_list& ul) {  // must to rewrite to simple copy by iterator and insert / push_back
         if (ul.begin_->is_sentinel) { return; }
         const sentinel_node* other = ul.begin_;
         begin_ = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
@@ -136,19 +136,35 @@ public:
     using iterator = list_iterator<false>;
     using const_iterator = list_iterator<true>;
 
+    // TODO: immediately allocate a true node for begin_ -> rewrite logic for other methods. (we allocate only one sentinel_node [for end])
+    // add an assert to node_size, that it must be more than one.
     unrolled_list() {
         begin_ = end_ = std::allocator_traits<sentinel_node_allocator_type>::allocate(sentinel_node_allocator, 1);
         std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, begin_);
         begin_->prev = begin_->next = end_->prev = end_->next = begin_;
     }
-    unrolled_list(const allocator_type& alloc) : unrolled_list(), allocator(alloc) {}
     unrolled_list(const unrolled_list& ul) : unrolled_list() { initialize_copy(ul); }
     unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul), allocator(alloc) {}
+    unrolled_list(const allocator_type& alloc) : unrolled_list(), allocator(alloc) {}
+    unrolled_list(size_type n, value_type el) : unrolled_list() {
+        for (size_type i = 0; i != n; ++i) { this->push_back(el); }
+    }
+    template<typename ForwardIterator>
+    unrolled_list(ForwardIterator begin, ForwardIterator end) : unrolled_list() {
+        while (begin != end) { this->push_back(*begin++); }
+    }
+    unrolled_list(std::initializer_list<T> il) : unrolled_list() {
+        for (auto iter = il.begin(); iter != il.end(); ++iter) { this->push_back(*iter); }
+    }
     unrolled_list& operator=(const unrolled_list& rhs) {
         if (this == &rhs) { return *this; }
         clear();
         initialize_copy(rhs);
         return *this;
+    }
+    unrolled_list& operator=(std::initializer_list<T> il) {
+        clear();
+        for (auto iter = il.begin(); iter != il.end(); ++iter) { this->push_back(*iter); }
     }
 
     ~unrolled_list() {
@@ -195,7 +211,7 @@ public:
 
     bool empty() const { return size_ == 0; }
 
-    void clear() {
+    void clear() noexcept {  // correct via the new begin / end idiom
         sentinel_node* del;
         while (!begin_->is_sentinel) {
             del = begin_;
@@ -205,5 +221,38 @@ public:
         }
         size_ = 0;
         begin_ = begin_->next = begin_->prev = end_->prev = end_;
+    }
+
+private:
+    void split(node* n) {
+        node* new_node = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
+        std::allocator_traits<node_allocator_type>::construct(node_allocator, new_node);
+        for (size_t i = 0; i != NodeMaxSize - NodeMaxSize / 2; ++i) {
+            new_node->data[i] = n->data[NodeMaxSize / 2 + i];
+        }
+        new_node->count = NodeMaxSize - NodeMaxSize / 2;
+        n->count = NodeMaxSize / 2;
+        new_node->next = n->next;
+        new_node->prev = n;
+        new_node->prev = new_node;
+        n->next = new_node;
+    }
+
+public:
+    iterator insert(iterator iter, const T& value) {
+        if (static_cast<node*>(iter.node)->count == NodeMaxSize) { 
+            split(static_cast<node*>(iter.node));
+            if (iter.index >= NodeMaxSize / 2) {
+                iter = {iter.node->next, static_cast<node*>(iter.node)->count - NodeMaxSize / 2};
+            }
+        }
+        for (size_type i = 0; i != static_cast<node*>(iter.node)->count - iter.index + 1; ++i) {
+            static_cast<node*>(iter.node)->data[static_cast<node*>(iter.node)->count - i] = static_cast<node*>(iter.node)->data[static_cast<node*>(iter.node)->count - i - 1];
+        }
+        *iter = value;
+        return iter;
+    }
+    void push_back(const T& value) {
+        insert(end(), value);
     }
 };

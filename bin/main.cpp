@@ -28,5 +28,7 @@ int main(int argc, char** argv) {
     unrolled_list<int, 10, Allocator<int>>::swap(list, list4);
     list.clear();
     std::cout << (list == list4) << ' ' << list.empty() << ' ' << list.max_size() << '\n';
+
+    unrolled_list<int, 10, Allocator<int>> list5 = {1, 2, 3, 4};
     return 0;
 }
