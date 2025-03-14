@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <compare>
 #include <iterator>
 #include <memory>
 #include <list>
@@ -109,16 +110,9 @@ private:
     using node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<node>;
     node_allocator_type node_allocator;
 
-public:
-    using iterator = list_iterator<false>;
-    using const_iterator = list_iterator<true>;
-
-    unrolled_list() {
-        begin_ = end_ = std::allocator_traits<sentinel_node_allocator_type>::allocate(sentinel_node_allocator, 1);
-        std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, begin_);
-        begin_->prev = begin_->next = end_->prev = end_->next = begin_;
-    }
-    unrolled_list(const unrolled_list& ul) : unrolled_list() {
+    /// @brief copy to a clear object
+    /// @warning be sure, that you copy into a clear object
+    void initialize_copy(const unrolled_list& ul) {
         if (ul.begin_->is_sentinel) { return; }
         const sentinel_node* other = ul.begin_;
         begin_ = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
@@ -136,6 +130,29 @@ public:
         }
     }
 
+public:
+    using iterator = list_iterator<false>;
+    using const_iterator = list_iterator<true>;
+
+    unrolled_list() {
+        begin_ = end_ = std::allocator_traits<sentinel_node_allocator_type>::allocate(sentinel_node_allocator, 1);
+        std::allocator_traits<sentinel_node_allocator_type>::construct(sentinel_node_allocator, begin_);
+        begin_->prev = begin_->next = end_->prev = end_->next = begin_;
+    }
+    unrolled_list(const unrolled_list& ul) : unrolled_list() { initialize_copy(ul); }
+    unrolled_list& operator=(const unrolled_list& rhs) {
+        if (this == &rhs) { return *this; }
+        clear();
+        initialize_copy(rhs);
+        return *this;
+    }
+
+    ~unrolled_list() {
+        clear();
+        std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, end_);
+        std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, end_, 1);
+    }
+
     iterator begin() { return {begin_, 0}; }
     const_iterator cbegin() const { return {begin_, 0}; }
     iterator end() { return {end_, 0}; }
@@ -150,11 +167,21 @@ public:
         }
         return true;
     }
-    bool operator!=(const unrolled_list& rhs) {
-        return !(*this == rhs);
-    }
+    bool operator!=(const unrolled_list& rhs) const { return !(*this == rhs); }
 
-    ~unrolled_list() {
+    void swap(unrolled_list& rhs) {
+        unrolled_list tmp(rhs);
+        *this = rhs;
+        rhs = tmp;
+    }
+    inline static void swap(unrolled_list& lhs, unrolled_list& rhs) { lhs.swap(rhs); }
+
+    size_type size() const { return size_; }
+    size_type max_size() const { return std::allocator_traits<node_allocator_type>::max_size(node_allocator) * NodeMaxSize; }
+
+    bool empty() const { return size_ == 0; }
+
+    void clear() {
         sentinel_node* del;
         while (!begin_->is_sentinel) {
             del = begin_;
@@ -162,7 +189,7 @@ public:
             std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, del);
             std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, del, 1);
         }
-        std::allocator_traits<sentinel_node_allocator_type>::destroy(sentinel_node_allocator, end_);
-        std::allocator_traits<sentinel_node_allocator_type>::deallocate(sentinel_node_allocator, end_, 1);
+        size_ = 0;
+        begin_ = begin_->next = begin_->prev = end_->prev = end_;
     }
 };
