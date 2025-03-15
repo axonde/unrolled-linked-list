@@ -221,18 +221,17 @@ private:
         node* new_node = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
         std::allocator_traits<node_allocator_type>::construct(node_allocator, new_node);
         new_node->next = iter.node->next;
-        new_node->next->prev = new_node;
         new_node->prev = iter.node;
+        new_node->next->prev = new_node;
         iter.node->next = new_node;
         for (size_t i = 0; i != NodeMaxSize - iter.index; ++i) {
             new_node->data[i] = static_cast<node*>(iter.node)->data[iter.index + i];
         }
-        if (NodeMaxSize - iter.index == 0) {
+        if (new_node->count = NodeMaxSize - iter.index; new_node->count == 0) {
             iter.node = new_node;
             iter.index = 0;
-        } else {
-            static_cast<node*>(iter.node)->count = iter.index;
         }
+        static_cast<node*>(iter.node)->count = iter.index;
     }
 
 public:
@@ -244,8 +243,18 @@ public:
         if (static_cast<node*>(iter.node)->count == NodeMaxSize) {
             split(iter);
         }
+        node* iter_node = static_cast<node*>(iter.node);
+        for (size_type i = 0; i != iter_node->count - iter.index; ++i) {
+            iter_node->data[iter_node->count - i] = iter_node->data[iter_node->count - i - 1];
+        }
         *iter = value;
-        ++static_cast<node*>(iter.node)->count;
+        ++iter_node->count;
+        return iter;
+    }
+    iterator insert(iterator iter, size_type n, const T& value) {
+        for (size_type i = 0; i != n; ++i) {
+            iter = insert(iter, value);
+        }
         return iter;
     }
     void push_back(const T& value) {

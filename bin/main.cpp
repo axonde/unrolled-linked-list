@@ -21,12 +21,11 @@ public:
 int main(int argc, char** argv) {
     std::cout << "Hello, world!" << std::endl;
     unrolled_list<int, 1, Allocator<int>> list2 = {1, 2, 3, 4, 5};
+    list2.insert(------list2.end(), 10);
+    list2.insert(list2.begin(), 3, 6);
     for (auto iter = list2.begin(); iter != list2.end(); ++iter) {
         std::cout << *iter << ' ';
     }
     std::cout << '\n';
-    // std::cout << (list == list4) << ' ' << list.empty() << ' ' << list.max_size() << '\n';
-
-    // unrolled_list<int, 10, Allocator<int>> list5 = {1, 2, 3, 4};
     return 0;
 }
