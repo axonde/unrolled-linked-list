@@ -49,8 +49,10 @@ private:
         using iterator_category = std::bidirectional_iterator_tag;
 
         list_iterator() = default;
+    private:
         list_iterator(sentinel_node* n, size_t i) : node(n), index(i) {}
 
+    public:
         conditional<isConst, const_reference, reference>::type operator*() const {
             if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
             return static_cast<struct node*>(node)->data[index]; 
@@ -97,7 +99,7 @@ private:
         bool operator!=(const list_iterator& rhs) const noexcept {
             return !(*this == rhs);
         }
-        friend list_iterator<false> unrolled_list::insert(list_iterator<false> iter, const T& value);
+        friend unrolled_list;
     private:
         sentinel_node* node;
         size_t index;
@@ -215,32 +217,35 @@ public:
     }
 
 private:
-    void split(node* n) {
+    void split(iterator& iter) {
         node* new_node = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
         std::allocator_traits<node_allocator_type>::construct(node_allocator, new_node);
-        for (size_t i = 0; i != NodeMaxSize - NodeMaxSize / 2; ++i) {
-            new_node->data[i] = n->data[NodeMaxSize / 2 + i];
+        new_node->next = iter.node->next;
+        new_node->next->prev = new_node;
+        new_node->prev = iter.node;
+        iter.node->next = new_node;
+        for (size_t i = 0; i != NodeMaxSize - iter.index; ++i) {
+            new_node->data[i] = static_cast<node*>(iter.node)->data[iter.index + i];
         }
-        new_node->count = NodeMaxSize - NodeMaxSize / 2;
-        n->count = NodeMaxSize / 2;
-        new_node->next = n->next;
-        new_node->prev = n;
-        new_node->prev = new_node;
-        n->next = new_node;
+        if (NodeMaxSize - iter.index == 0) {
+            iter.node = new_node;
+            iter.index = 0;
+        } else {
+            static_cast<node*>(iter.node)->count = iter.index;
+        }
     }
 
 public:
     iterator insert(iterator iter, const T& value) {
-        if (static_cast<node*>(iter.node)->count == NodeMaxSize) { 
-            split(static_cast<node*>(iter.node));
-            if (iter.index >= NodeMaxSize / 2) {
-                iter = {iter.node->next, static_cast<node*>(iter.node)->count - NodeMaxSize / 2};
-            }
+        if (iter.node->is_sentinel) {
+            iter.node = iter.node->prev;
+            iter.index = static_cast<node*>(iter.node)->count;
         }
-        for (size_type i = 0; i != static_cast<node*>(iter.node)->count - iter.index + 1; ++i) {
-            static_cast<node*>(iter.node)->data[static_cast<node*>(iter.node)->count - i] = static_cast<node*>(iter.node)->data[static_cast<node*>(iter.node)->count - i - 1];
+        if (static_cast<node*>(iter.node)->count == NodeMaxSize) {
+            split(iter);
         }
         *iter = value;
+        ++static_cast<node*>(iter.node)->count;
         return iter;
     }
     void push_back(const T& value) {
