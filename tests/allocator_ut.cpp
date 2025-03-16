@@ -58,7 +58,7 @@ public:
     }
 
     void deallocate(pointer p, std::size_t n) {
-
+        delete p;
     }
 
     bool operator==(const TestAllocator& other) const {
