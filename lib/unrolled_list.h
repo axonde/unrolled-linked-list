@@ -113,9 +113,10 @@ private:
         size_t index;
     };
 
-    using sentinel_node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<sentinel_node>;
-    sentinel_node_allocator_type sentinel_node_allocator;
+    // using sentinel_node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<sentinel_node>;
+    using sentinel_node_allocator_type = std::allocator<sentinel_node>;
     using node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<node>;
+    sentinel_node_allocator_type sentinel_node_allocator;
     node_allocator_type node_allocator;
     allocator_type allocator;
 
@@ -145,7 +146,7 @@ public:
     }
     unrolled_list(const unrolled_list& ul) : unrolled_list() { initialize_copy(ul); }
     unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul), allocator(alloc) {}
-    unrolled_list(const allocator_type& alloc) : unrolled_list(), allocator(alloc) {}
+    unrolled_list(const allocator_type& alloc) : unrolled_list() { allocator = alloc; }
     unrolled_list(size_type n, value_type el) : unrolled_list() {
         for (size_type i = 0; i != n; ++i) { push_back(el); }
     }

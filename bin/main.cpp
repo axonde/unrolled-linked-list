@@ -20,14 +20,12 @@ public:
 
 int main(int argc, char** argv) {
     std::cout << "Hello, world!" << std::endl;
-    unrolled_list<int, 1, Allocator<int>> list2 = {1, 2, 3, 4, 5};
-    list2.insert(++list2.begin(), {8, 9, 10, 11, 12, 13});
-    for (auto i = list2.begin(); i != list2.end(); ++i) {
-        std::cout << *i << ' ';
+    // unrolled_list<int, 1, Allocator<int>> list2 = {1, 2};
+    // list2.insert(++list2.begin(), {8, 9, 10, 11, 12, 13});
+    unrolled_list<int, 5, Allocator<int>> list;
+    for (int i = 0; i < 11; ++i) {
+        list.push_back(9);
     }
     std::cout << '\n';
-
-    // auto iter_const = list2.begin();
-    // unrolled_list<int, 1, Allocator<int>>::const_iterator iter = iter_const;
     return 0;
 }
