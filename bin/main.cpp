@@ -21,11 +21,13 @@ public:
 int main(int argc, char** argv) {
     std::cout << "Hello, world!" << std::endl;
     unrolled_list<int, 1, Allocator<int>> list2 = {1, 2, 3, 4, 5};
-    list2.insert(------list2.end(), 10);
-    list2.insert(list2.begin(), 3, 6);
-    for (auto iter = list2.begin(); iter != list2.end(); ++iter) {
-        std::cout << *iter << ' ';
+    list2.insert(++list2.begin(), {8, 9, 10, 11, 12, 13});
+    for (auto i = list2.begin(); i != list2.end(); ++i) {
+        std::cout << *i << ' ';
     }
     std::cout << '\n';
+
+    // auto iter_const = list2.begin();
+    // unrolled_list<int, 1, Allocator<int>>::const_iterator iter = iter_const;
     return 0;
 }

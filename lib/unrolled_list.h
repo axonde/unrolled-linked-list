@@ -3,18 +3,22 @@
 #include <iterator>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 
 #include <iostream>
 
-template<bool B, class T, class F>
-struct conditional { using type = T; };
- 
-template<class T, class F>
-struct conditional<false, T, F> { using type = F; };
+#include <vector>
 
 template<typename T, size_t NodeMaxSize = 10, typename Allocator = std::allocator<T>>
 class unrolled_list {
     static_assert(NodeMaxSize > 0, "NodeMaxSize must be greater than zero");
+
+    template<bool B, typename U, typename F>
+    struct conditional { using type = U; };
+
+    template<typename U, typename F>
+    struct conditional<false, U, F> { using type = F; };
+
 public:
     using value_type = T;
     using reference = T&;
@@ -47,8 +51,12 @@ private:
     template <bool isConst>
     struct list_iterator {
         using iterator_category = std::bidirectional_iterator_tag;
+        friend unrolled_list;
 
         list_iterator() = default;
+        template <bool OtherConst, typename = std::enable_if_t<isConst || !OtherConst>>
+        list_iterator(const list_iterator<OtherConst>& other) : node(other.node), index(other.index) {}
+
     private:
         list_iterator(sentinel_node* n, size_t i) : node(n), index(i) {}
 
@@ -81,7 +89,7 @@ private:
             if (index == 0) {
                 node = node->prev;
                 index = static_cast<struct node*>(node)->count - 1;
-            }
+            } else { --index; }
             return *this;
         }
         list_iterator operator--(int) {
@@ -99,7 +107,7 @@ private:
         bool operator!=(const list_iterator& rhs) const noexcept {
             return !(*this == rhs);
         }
-        friend unrolled_list;
+
     private:
         sentinel_node* node;
         size_t index;
@@ -113,12 +121,12 @@ private:
 
     void initialize_copy(const unrolled_list& ul) {
         for (auto iter = ul.begin(); iter != ul.end(); ++iter) {
-            this->push_back(*iter);
+            push_back(*iter);
         }
     }
     template<typename ForwardIterator>
     void initialize_copy(ForwardIterator begin, ForwardIterator end) {
-        while (begin != end) { this->push_back(*begin++); }
+        while (begin != end) { push_back(*begin++); }
     }
 
 public:
@@ -139,7 +147,7 @@ public:
     unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul), allocator(alloc) {}
     unrolled_list(const allocator_type& alloc) : unrolled_list(), allocator(alloc) {}
     unrolled_list(size_type n, value_type el) : unrolled_list() {
-        for (size_type i = 0; i != n; ++i) { this->push_back(el); }
+        for (size_type i = 0; i != n; ++i) { push_back(el); }
     }
     template<typename ForwardIterator>
     unrolled_list(ForwardIterator begin, ForwardIterator end) : unrolled_list() { initialize_copy(begin, end); }
@@ -195,7 +203,7 @@ public:
     inline static void swap(unrolled_list& lhs, unrolled_list& rhs) { lhs.swap(rhs); }
 
     size_type size() const { return size_; }
-    size_type max_size() const { return std::allocator_traits<node_allocator_type>::max_size(node_allocator) * NodeMaxSize; }
+    size_type max_size() const { return std::allocator_traits<node_allocator_type>::max_size(node_allocator) * NodeMaxSize / sizeof(T); }
 
     allocator_type get_allocator() const { return allocator; }
 
@@ -227,7 +235,8 @@ private:
         for (size_t i = 0; i != NodeMaxSize - iter.index; ++i) {
             new_node->data[i] = static_cast<node*>(iter.node)->data[iter.index + i];
         }
-        if (new_node->count = NodeMaxSize - iter.index; new_node->count == 0) {
+        new_node->count = NodeMaxSize - iter.index;
+        if (new_node->count == 0) {
             iter.node = new_node;
             iter.index = 0;
         }
@@ -235,7 +244,8 @@ private:
     }
 
 public:
-    iterator insert(iterator iter, const T& value) {
+    iterator insert(const_iterator const_iter, const T& value) {
+        iterator iter(const_iter.node, const_iter.index);
         if (iter.node->is_sentinel) {
             iter.node = iter.node->prev;
             iter.index = static_cast<node*>(iter.node)->count;
@@ -251,13 +261,51 @@ public:
         ++iter_node->count;
         return iter;
     }
-    iterator insert(iterator iter, size_type n, const T& value) {
+    iterator insert(const_iterator const_iter, size_type n, const T& value) {
+        iterator iter = {const_iter.node, const_iter.index};
+        iterator copy = iter;
         for (size_type i = 0; i != n; ++i) {
-            iter = insert(iter, value);
+            iter = insert(iter, value); ++iter;
         }
-        return iter;
+        return copy;
     }
-    void push_back(const T& value) {
-        insert(end(), value);
+    template <typename InputIterator, typename = std::enable_if_t<
+        !std::is_integral<InputIterator>::value &&
+        std::is_same_v<
+            typename std::iterator_traits<InputIterator>::iterator_category,
+            std::input_iterator_tag
+        >
+    >>
+    iterator insert(const_iterator const_iter, InputIterator begin, InputIterator end) {
+        iterator iter = {const_iter.node, const_iter.index};
+        iterator copy = iter;
+        if (begin == end) { return copy; }
+        iter = copy = insert(iter, *begin++);
+        while (begin != end) { iter = insert(iter, *begin++); ++iter; }
+        return copy;
     }
+    iterator insert(const_iterator const_iter, std::initializer_list<T> il) {
+        iterator iter = {const_iter.node, const_iter.index};
+        iterator copy = iter;
+        for (auto i = il.begin(); i != il.end(); ++i) {
+            iter = insert(iter, *i);
+            if (i == il.begin()) { copy = iter; }
+            ++iter;
+        }
+        return copy;
+    }
+
+    template<typename InputIterator>
+    void assign(InputIterator begin, InputIterator end) {
+        clear();
+        initialize_copy(begin, end);
+    }
+    void assing(std::initializer_list<T> il) { assing(il.begin(), il.end()); }
+    void assing(size_type n, const T& value) {
+        clear();
+        for (size_type i = 0; i != n; ++i) { push_back(value); }
+    }
+
+    void push_back(const T& value) { insert(end(), value); }
+    void push_front(const T& value) { insert(begin(), value); }
 };
