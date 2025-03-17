@@ -75,7 +75,7 @@ private:
 
         list_iterator& operator++() {
             if (node->is_sentinel) { throw std::out_of_range("cannot increment the end (rend) iterator"); }
-            if (++index == static_cast<struct node*>(node)->count) {
+            if (++index >= static_cast<struct node*>(node)->count) {
                 index = 0;
                 node = node->next;
             }
@@ -88,7 +88,7 @@ private:
         }
 
         list_iterator& operator--() {
-            if (node->prev->is_sentinel) { throw std::out_of_range("cannot decrement the begin (rbegin) iterator"); }
+            if (node->prev->is_sentinel && index == 0) { throw std::out_of_range("cannot decrement the begin (rbegin) iterator"); }
             if (index == 0) {
                 node = node->prev;
                 index = static_cast<struct node*>(node)->count - 1;
@@ -102,9 +102,10 @@ private:
         }
 
         bool operator==(const list_iterator& rhs) const noexcept {
-            if (node != rhs.node) { return false; }
+            if ((node->prev->is_sentinel && node->next->is_sentinel && static_cast<struct node*>(node)->count == 0) ||  // check for empty container
+                (rhs.node->prev->is_sentinel && rhs.node->next->is_sentinel && static_cast<struct node*>(rhs.node)->count == 0)) { return true; }
             if (node->is_sentinel && rhs.node->is_sentinel) { return true; }
-            if (node->is_sentinel || rhs.node->is_sentinel) { return false; }
+            if (node != rhs.node) { return false; }
             return index == rhs.index && static_cast<struct node*>(node)->data[index] == static_cast<struct node*>(rhs.node)->data[rhs.index];
         }
         bool operator!=(const list_iterator& rhs) const noexcept {
@@ -247,9 +248,15 @@ private:
         static_cast<node*>(iter.node)->count = iter.index;
     }
     void deallocate_node(iterator& iter) {
+        /// the problem: we dont deallocate the begin node at the start, becausee that was the meaning of the action, but there is a problem
+        /// if we dont delete it, we will have a empty begin.. must to correct that.
+        std::cout << "run node deallocating...\n";
+        if (iter.node == begin_) { return; }
         iter.node->prev->next = iter.node->next;
         iter.node->next->prev = iter.node->prev;
-        sentinel_node* next_node = iter.node->next; iter.index = 0;
+        sentinel_node* next_node = iter.node->next;
+        std::allocator_traits<node_allocator_type>::destroy(node_allocator, static_cast<node*>(iter.node));
+        std::cout << "have a problem there: \n";
         std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(iter.node), 1);
         iter.node = next_node;
     }
@@ -309,24 +316,25 @@ public:
     }
 
     iterator erase(const_iterator const_iter) {
-        if (const_iter.node->is_sentinel || (const_iter.node == begin_ && size_ == 0)) {
-            return end();
-        }
+        if (const_iter == end() || (const_iter == begin() && size_ == 0)) return end();
         iterator iter = {const_iter.node, const_iter.index};
         node* casted_node = static_cast<node*>(iter.node);
+        std::cout << "Debug the node: " << casted_node->count << " totals and iter " << iter.index << '\n';
         for (size_type i = iter.index; i != casted_node->count; ++i) {
             if (i != iter.index) {
+                std::cout << "\t" << casted_node->count << ' ' << i << ' ' << size() << '\n';
                 new (&reinterpret_cast<T*>(casted_node->data)[i - 1]) T(reinterpret_cast<T*>(casted_node->data)[i]);
             }
             reinterpret_cast<T*>(casted_node->data)[i].~T();
         }
+        if (casted_node->count - 1 == iter.index) { --iter.index; }
         if (--casted_node->count == 0) { deallocate_node(iter); }
         --size_;
         return iter;
     }
     iterator erase(const_iterator begin, const_iterator end) {
         iterator iter = {begin.node, begin.index};
-        while (iter != end && iter != end_) {
+        while (iter != end && iter != end()) {
             iter = erase(iter);
         }
         return iter;

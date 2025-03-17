@@ -20,6 +20,7 @@ add_executable(
     named_requirements_ut.cpp
     no_default_constructible_ut.cpp
     simple_ut.cpp
+    iterators_ut.cpp
 )
 
 target_link_libraries(
