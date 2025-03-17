@@ -228,7 +228,7 @@ public:
     }
 
 private:
-    void split(iterator& iter) {  /// need to fix assignment due to char buffer
+    void split(iterator& iter) {
         node* new_node = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
         std::allocator_traits<node_allocator_type>::construct(node_allocator, new_node);
         new_node->next = iter.node->next;
@@ -246,9 +246,16 @@ private:
         }
         static_cast<node*>(iter.node)->count = iter.index;
     }
+    void deallocate_node(iterator& iter) {
+        iter.node->prev->next = iter.node->next;
+        iter.node->next->prev = iter.node->prev;
+        sentinel_node* next_node = iter.node->next; iter.index = 0;
+        std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(iter.node), 1);
+        iter.node = next_node;
+    }
 
 public:
-    iterator insert(const_iterator const_iter, const T& value) {  /// need to fix assignment due to char buffer
+    iterator insert(const_iterator const_iter, const T& value) {
         iterator iter(const_iter.node, const_iter.index);
         if (iter.node->is_sentinel) {
             iter.node = iter.node->prev;
@@ -259,7 +266,6 @@ public:
         }
         node* iter_node = static_cast<node*>(iter.node);
         for (size_type i = 0; i != iter_node->count - iter.index; ++i) {
-            // iter_node->data[iter_node->count - i] = iter_node->data[iter_node->count - i - 1];
             new (&reinterpret_cast<T*>(iter_node->data)[iter_node->count - i]) T(reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1]);
             reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1].~T();
         }
@@ -302,6 +308,30 @@ public:
         return copy;
     }
 
+    iterator erase(const_iterator const_iter) {
+        if (const_iter.node->is_sentinel || (const_iter.node == begin_ && size_ == 0)) {
+            return end();
+        }
+        iterator iter = {const_iter.node, const_iter.index};
+        node* casted_node = static_cast<node*>(iter.node);
+        for (size_type i = iter.index; i != casted_node->count; ++i) {
+            if (i != iter.index) {
+                new (&reinterpret_cast<T*>(casted_node->data)[i - 1]) T(reinterpret_cast<T*>(casted_node->data)[i]);
+            }
+            reinterpret_cast<T*>(casted_node->data)[i].~T();
+        }
+        if (--casted_node->count == 0) { deallocate_node(iter); }
+        --size_;
+        return iter;
+    }
+    iterator erase(const_iterator begin, const_iterator end) {
+        iterator iter = {begin.node, begin.index};
+        while (iter != end && iter != end_) {
+            iter = erase(iter);
+        }
+        return iter;
+    }
+
     template<typename InputIterator>
     void assign(InputIterator begin, InputIterator end) {
         clear();
@@ -315,4 +345,7 @@ public:
 
     void push_back(const T& value) { insert(end(), value); }
     void push_front(const T& value) { insert(begin(), value); }
+
+    void pop_front() { erase(begin()); }
+    void pop_back() { erase(--end()); }  // trouble!
 };

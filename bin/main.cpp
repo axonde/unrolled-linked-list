@@ -23,12 +23,14 @@ int main(int argc, char** argv) {
     // unrolled_list<int, 1, Allocator<int>> list2 = {1, 2};
     // list2.insert(++list2.begin(), {8, 9, 10, 11, 12, 13});
     unrolled_list<int, 5, Allocator<int>> list;
-    for (int i = 0; i < 11; ++i) {
+    for (int i = 0; i < 1; ++i) {
         list.push_back(i);
+        list.pop_front();
     }
+    // list.pop_front();
     for (auto iter = list.begin(); iter != list.end(); ++iter) {
         std::cout << *iter << ' ';
     }
-    std::cout << '\n';
+    std::cout << '\n' << list.size() << '\n';
     return 0;
 }

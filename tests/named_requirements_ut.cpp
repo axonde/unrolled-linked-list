@@ -70,8 +70,8 @@ concept SequenceContainer = requires(T a, const T b, typename T::value_type valu
     requires requires(typename T::const_iterator pos, const T::const_iterator pos2, typename T::size_type n) {
         { a.insert(pos, value) } -> std::same_as<typename T::iterator>;
         { a.insert(pos, n, value) } -> std::same_as<typename T::iterator>;
-        // { a.erase(pos) } -> std::same_as<typename T::iterator>;
-        // { a.erase(pos, pos2) } -> std::same_as<typename T::iterator>;
+        { a.erase(pos) } -> std::same_as<typename T::iterator>;
+        { a.erase(pos, pos2) } -> std::same_as<typename T::iterator>;
         { a.clear() };
     };
 };
