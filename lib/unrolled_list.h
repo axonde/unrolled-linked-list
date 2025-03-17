@@ -1,5 +1,4 @@
 #include <cstddef>
-#include <compare>
 #include <iterator>
 #include <memory>
 #include <stdexcept>
@@ -40,7 +39,8 @@ private:
         using sentinel_node::next;
         using sentinel_node::prev;
         node() : sentinel_node(false) {}
-        T data[NodeMaxSize];
+        // T data[NodeMaxSize];
+        alignas(T) unsigned char data[sizeof(T) * NodeMaxSize];
         size_t count = 0;
     };
 
@@ -50,24 +50,27 @@ private:
 
     template <bool isConst>
     struct list_iterator {
+        using value_type = unrolled_list::value_type;
+        using difference_type = unrolled_list::difference_type;
+        using reference = unrolled_list::reference;
+        using pointer = unrolled_list::pointer;
         using iterator_category = std::bidirectional_iterator_tag;
         friend unrolled_list;
 
         list_iterator() = default;
         template <bool OtherConst, typename = std::enable_if_t<isConst || !OtherConst>>
         list_iterator(const list_iterator<OtherConst>& other) : node(other.node), index(other.index) {}
-
     private:
         list_iterator(sentinel_node* n, size_t i) : node(n), index(i) {}
 
     public:
         conditional<isConst, const_reference, reference>::type operator*() const {
             if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
-            return static_cast<struct node*>(node)->data[index]; 
+            return reinterpret_cast<T*>(static_cast<struct node*>(node)->data)[index];
         }
         conditional<isConst, const_pointer, pointer>::type operator->() const {
             if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
-            return &static_cast<struct node*>(node)->data[index];
+            return reinterpret_cast<T*>(static_cast<struct node*>(node)->data) + index;
         }
 
         list_iterator& operator++() {
@@ -113,7 +116,6 @@ private:
         size_t index;
     };
 
-    // using sentinel_node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<sentinel_node>;
     using sentinel_node_allocator_type = std::allocator<sentinel_node>;
     using node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<node>;
     sentinel_node_allocator_type sentinel_node_allocator;
@@ -121,9 +123,7 @@ private:
     allocator_type allocator;
 
     void initialize_copy(const unrolled_list& ul) {
-        for (auto iter = ul.begin(); iter != ul.end(); ++iter) {
-            push_back(*iter);
-        }
+        for (auto iter = ul.begin(); iter != ul.end(); ++iter) { push_back(*iter); }
     }
     template<typename ForwardIterator>
     void initialize_copy(ForwardIterator begin, ForwardIterator end) {
@@ -145,13 +145,15 @@ public:
         end_->prev = begin_;
     }
     unrolled_list(const unrolled_list& ul) : unrolled_list() { initialize_copy(ul); }
-    unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul), allocator(alloc) {}
+    unrolled_list(const unrolled_list& ul, const allocator_type& alloc) : unrolled_list(ul) { allocator = alloc; }
     unrolled_list(const allocator_type& alloc) : unrolled_list() { allocator = alloc; }
     unrolled_list(size_type n, value_type el) : unrolled_list() {
         for (size_type i = 0; i != n; ++i) { push_back(el); }
     }
     template<typename ForwardIterator>
     unrolled_list(ForwardIterator begin, ForwardIterator end) : unrolled_list() { initialize_copy(begin, end); }
+    template<typename ForwardIterator>
+    unrolled_list(ForwardIterator begin, ForwardIterator end, Allocator& alloc) : unrolled_list(begin, end) { allocator = alloc; }
     unrolled_list(std::initializer_list<T> il) : unrolled_list() { initialize_copy(il.begin(), il.end()); }
     unrolled_list& operator=(const unrolled_list& rhs) {
         if (this == &rhs) { return *this; }
@@ -226,7 +228,7 @@ public:
     }
 
 private:
-    void split(iterator& iter) {
+    void split(iterator& iter) {  /// need to fix assignment due to char buffer
         node* new_node = std::allocator_traits<node_allocator_type>::allocate(node_allocator, 1);
         std::allocator_traits<node_allocator_type>::construct(node_allocator, new_node);
         new_node->next = iter.node->next;
@@ -234,7 +236,8 @@ private:
         new_node->next->prev = new_node;
         iter.node->next = new_node;
         for (size_t i = 0; i != NodeMaxSize - iter.index; ++i) {
-            new_node->data[i] = static_cast<node*>(iter.node)->data[iter.index + i];
+            new(&reinterpret_cast<T*>(new_node->data)[i]) T(reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i]);
+            reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i].~T();
         }
         new_node->count = NodeMaxSize - iter.index;
         if (new_node->count == 0) {
@@ -245,7 +248,7 @@ private:
     }
 
 public:
-    iterator insert(const_iterator const_iter, const T& value) {
+    iterator insert(const_iterator const_iter, const T& value) {  /// need to fix assignment due to char buffer
         iterator iter(const_iter.node, const_iter.index);
         if (iter.node->is_sentinel) {
             iter.node = iter.node->prev;
@@ -256,10 +259,13 @@ public:
         }
         node* iter_node = static_cast<node*>(iter.node);
         for (size_type i = 0; i != iter_node->count - iter.index; ++i) {
-            iter_node->data[iter_node->count - i] = iter_node->data[iter_node->count - i - 1];
+            // iter_node->data[iter_node->count - i] = iter_node->data[iter_node->count - i - 1];
+            new (&reinterpret_cast<T*>(iter_node->data)[iter_node->count - i]) T(reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1]);
+            reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1].~T();
         }
         *iter = value;
         ++iter_node->count;
+        ++size_;
         return iter;
     }
     iterator insert(const_iterator const_iter, size_type n, const T& value) {

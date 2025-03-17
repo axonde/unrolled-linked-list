@@ -24,7 +24,10 @@ int main(int argc, char** argv) {
     // list2.insert(++list2.begin(), {8, 9, 10, 11, 12, 13});
     unrolled_list<int, 5, Allocator<int>> list;
     for (int i = 0; i < 11; ++i) {
-        list.push_back(9);
+        list.push_back(i);
+    }
+    for (auto iter = list.begin(); iter != list.end(); ++iter) {
+        std::cout << *iter << ' ';
     }
     std::cout << '\n';
     return 0;

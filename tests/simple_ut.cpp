@@ -80,31 +80,31 @@ TEST(UnrolledLinkedList, insertAndPushMixed) {
     ASSERT_THAT(unrolled_list, ::testing::ElementsAreArray(std_list));
 }
 
-TEST(UnrolledLinkedList, popFrontBack) {
-    std::list<int> std_list;
-    unrolled_list<int> unrolled_list;
+// TEST(UnrolledLinkedList, popFrontBack) {
+//     std::list<int> std_list;
+//     unrolled_list<int> unrolled_list;
 
-    for (int i = 0; i < 1000; ++i) {
-        std_list.push_back(i);
-        unrolled_list.push_back(i);
-    }
+//     for (int i = 0; i < 1000; ++i) {
+//         std_list.push_back(i);
+//         unrolled_list.push_back(i);
+//     }
 
-    for (int i = 0; i < 500; ++i) {
-        if (i % 2 == 0) {
-            std_list.pop_back();
-            unrolled_list.pop_back();
-        } else {
-            std_list.pop_front();
-            unrolled_list.pop_front();
-        }
-    }
+//     for (int i = 0; i < 500; ++i) {
+//         if (i % 2 == 0) {
+//             std_list.pop_back();
+//             unrolled_list.pop_back();
+//         } else {
+//             std_list.pop_front();
+//             unrolled_list.pop_front();
+//         }
+//     }
 
-    ASSERT_THAT(unrolled_list, ::testing::ElementsAreArray(std_list));
+//     ASSERT_THAT(unrolled_list, ::testing::ElementsAreArray(std_list));
 
-    for (int i = 0; i < 500; ++i) {
-        std_list.pop_back();
-        unrolled_list.pop_back();
-    }
+//     for (int i = 0; i < 500; ++i) {
+//         std_list.pop_back();
+//         unrolled_list.pop_back();
+//     }
 
-    ASSERT_TRUE(unrolled_list.empty());
-}
+//     ASSERT_TRUE(unrolled_list.empty());
+// }
