@@ -134,6 +134,8 @@ private:
 public:
     using iterator = list_iterator<false>;
     using const_iterator = list_iterator<true>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
     /// @brief we allocate to node:  <node [begin]> -- <sentinel_node [end]>
     /// and we will be always work between begin and end:  <node [begin]> -- {inserting} -- <sentinel_node [end]>
@@ -181,6 +183,14 @@ public:
     iterator end() { return {end_, 0}; }
     const_iterator end() const { return {end_, 0}; }
     const_iterator cend() const { return {end_, 0}; }
+
+    reverse_iterator rbegin() { return reverse_iterator(end()); }
+    const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+    const_reverse_iterator crbegin() const { return const_reverse_iterator(end()); }
+    reverse_iterator rend() { return reverse_iterator(begin()); }
+    const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
+    const_reverse_iterator crend() const { return const_reverse_iterator(begin()); }
+
 
     bool operator==(const unrolled_list& rhs) const {
         if (size_ != rhs.size_) { return false; }
@@ -363,4 +373,10 @@ public:
 
     void pop_front() { erase(begin()); }
     void pop_back() { erase(--end()); }
+
+    reference front() { return *begin(); }
+    const_reference front() const { return *begin(); }
+
+    reference back() { return *(--end()); }
+    const_reference back() const { return *(--end()); }
 };

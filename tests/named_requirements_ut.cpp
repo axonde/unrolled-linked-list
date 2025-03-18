@@ -55,16 +55,16 @@ concept SequenceContainer = requires(T a, const T b, typename T::value_type valu
     requires std::assignable_from<T&, typename std::initializer_list<typename T::value_type>>;
 
 
-    // { a.front() } -> std::same_as<typename T::reference>;
-    // { b.front() } -> std::same_as<typename T::const_reference>;
-    // { a.back() } -> std::same_as<typename T::reference>;
-    // { b.back() } -> std::same_as<typename T::const_reference>;
+    { a.front() } -> std::same_as<typename T::reference>;
+    { b.front() } -> std::same_as<typename T::const_reference>;
+    { a.back() } -> std::same_as<typename T::reference>;
+    { b.back() } -> std::same_as<typename T::const_reference>;
 
     { a.push_front(value) } -> std::same_as<void>;
     { a.push_back(value) } -> std::same_as<void>;
 
-    // { a.pop_front() } -> std::same_as<void>;
-    // { a.pop_back() } -> std::same_as<void>;
+    { a.pop_front() } -> std::same_as<void>;
+    { a.pop_back() } -> std::same_as<void>;
 
 
     requires requires(typename T::const_iterator pos, const T::const_iterator pos2, typename T::size_type n) {
@@ -107,8 +107,8 @@ TEST(NamedRequirements, SequenceContainer) {
 }
 
 
-// TEST(NamedRequirements, ReversibleContainer) {
-//     static_assert(ReversibleContainer<unrolled_list<int, 10>>);
-// }
+TEST(NamedRequirements, ReversibleContainer) {
+    static_assert(ReversibleContainer<unrolled_list<int, 10>>);
+}
 
 
