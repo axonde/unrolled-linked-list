@@ -275,8 +275,10 @@ public:
             iter.node = iter.node->prev;
             iter.index = static_cast<node*>(iter.node)->count;
         }
+
         alignas(T) unsigned char buffer[sizeof(T) * NodeMaxSize];
         std::copy(static_cast<node*>(iter.node)->data, static_cast<node*>(iter.node)->data + sizeof(T) * NodeMaxSize, buffer);
+
         size_type i = 0;
         try {
             if (static_cast<node*>(iter.node)->count == NodeMaxSize) {
@@ -333,15 +335,28 @@ public:
         return copy;
     }
 
-    iterator erase(const_iterator const_iter) {  // add strong garantee
+    iterator erase(const_iterator const_iter) {  // TODO: add strong garantee
         if (const_iter == end() || (const_iter == begin() && size_ == 0)) return end();
         iterator iter = {const_iter.node, const_iter.index};
+
+        alignas(T) unsigned char buffer[sizeof(T) * NodeMaxSize];
+        std::copy(static_cast<node*>(iter.node)->data, static_cast<node*>(iter.node)->data + sizeof(T) * NodeMaxSize, buffer);
+
         node* casted_node = static_cast<node*>(iter.node);
-        for (size_type i = iter.index; i != casted_node->count; ++i) {
-            if (i != iter.index) {
-                new (&reinterpret_cast<T*>(casted_node->data)[i - 1]) T(reinterpret_cast<T*>(casted_node->data)[i]);
+        size_type i = iter.index;
+        try {
+            for (; i != casted_node->count; ++i) {
+                if (i != iter.index) {
+                    new (&reinterpret_cast<T*>(casted_node->data)[i - 1]) T(reinterpret_cast<T*>(casted_node->data)[i]);
+                }
+                reinterpret_cast<T*>(casted_node->data)[i].~T();
             }
-            reinterpret_cast<T*>(casted_node->data)[i].~T();
+        } catch(...) {
+            for (size_type j = 0; j != i; ++j) {
+                reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i].~T();
+            }
+            std::copy(buffer, buffer + sizeof(T) * NodeMaxSize, static_cast<node*>(iter.node)->data);
+            throw;
         }
         --size_; --casted_node->count;
         if (casted_node->count == 0) deallocate_node(iter);
