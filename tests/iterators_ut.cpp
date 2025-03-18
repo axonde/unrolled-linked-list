@@ -42,3 +42,12 @@ TEST(Iterators, BeginEqEndEmptyContainer) {
     list.push_back(1);
     ASSERT_NE(list.begin(), list.end());
 }
+TEST(Iterators, CanDecrementEmptyContainerEnd) {
+    unrolled_list<char> list;
+    ASSERT_NO_THROW(--list.end());
+    ASSERT_EQ(--list.end(), list.begin());
+}
+TEST(Iterators, DecrementEndAndGetValue) {
+    unrolled_list<char> list{1};
+    ASSERT_NO_THROW(*--list.end());
+}

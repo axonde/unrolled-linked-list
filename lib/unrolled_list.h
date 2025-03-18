@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <memory>
@@ -39,7 +40,6 @@ private:
         using sentinel_node::next;
         using sentinel_node::prev;
         node() : sentinel_node(false) {}
-        // T data[NodeMaxSize];
         alignas(T) unsigned char data[sizeof(T) * NodeMaxSize];
         size_t count = 0;
     };
@@ -213,19 +213,11 @@ public:
 
     bool empty() const { return size_ == 0; }
 
-    void clear() noexcept {
-        sentinel_node* del;
-        sentinel_node* curr_node = begin_->next;
-        while (!curr_node->is_sentinel) {
-            del = curr_node;
-            curr_node = curr_node->next;
-            std::allocator_traits<node_allocator_type>::destroy(node_allocator, static_cast<node*>(del));
-            std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(del), 1);
+    void clear() {
+        for (auto iter = --end(); iter != begin();) {
+            iter = --erase(iter);
         }
-        size_ = 0;
-        static_cast<node*>(begin_)->count = 0;
-        begin_->next = end_;
-        end_->prev = begin_;
+        erase(begin());
     }
 
 private:
@@ -236,9 +228,16 @@ private:
         new_node->prev = iter.node;
         new_node->next->prev = new_node;
         iter.node->next = new_node;
-        for (size_t i = 0; i != NodeMaxSize - iter.index; ++i) {
-            new(&reinterpret_cast<T*>(new_node->data)[i]) T(reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i]);
-            reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i].~T();
+        try {
+            for (size_t i = 0; i != NodeMaxSize - iter.index; ++i) {
+                new(&reinterpret_cast<T*>(new_node->data)[i]) T(reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i]);
+                reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[iter.index + i].~T();
+            }
+        } catch (...) {
+            iter.node->next = new_node->next;
+            std::allocator_traits<node_allocator_type>::destroy(node_allocator, new_node);
+            std::allocator_traits<node_allocator_type>::deallocate(node_allocator, new_node, 1);
+            throw;
         }
         new_node->count = NodeMaxSize - iter.index;
         if (new_node->count == 0) {
@@ -248,18 +247,15 @@ private:
         static_cast<node*>(iter.node)->count = iter.index;
     }
     void deallocate_node(iterator& iter) {
-        /// the problem: we dont deallocate the begin node at the start, becausee that was the meaning of the action, but there is a problem
-        /// if we dont delete it, we will have a empty begin.. must to correct that.
-        // std::cout << "run node deallocating...\n";
-        if (iter.node == begin_ && size_ == 0) { return; }
+        if (iter.node == begin_ && size_ == 0) { iter = end(); return; }
         if (iter.node == begin_) { begin_ = iter.node->next; }
         iter.node->prev->next = iter.node->next;
         iter.node->next->prev = iter.node->prev;
         sentinel_node* next_node = iter.node->next;
         std::allocator_traits<node_allocator_type>::destroy(node_allocator, static_cast<node*>(iter.node));
-        // std::cout << "have a problem there: \n";
         std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(iter.node), 1);
         iter.node = next_node;
+        iter.index = 0;
     }
 
 public:
@@ -269,18 +265,28 @@ public:
             iter.node = iter.node->prev;
             iter.index = static_cast<node*>(iter.node)->count;
         }
-        if (static_cast<node*>(iter.node)->count == NodeMaxSize) {
-            split(iter);
+        alignas(T) unsigned char buffer[sizeof(T) * NodeMaxSize];
+        std::copy(static_cast<node*>(iter.node)->data, static_cast<node*>(iter.node)->data + sizeof(T) * NodeMaxSize, buffer);
+        size_type i = 0;
+        try {
+            if (static_cast<node*>(iter.node)->count == NodeMaxSize) {
+                split(iter);
+            }
+            node* iter_node = static_cast<node*>(iter.node);
+            for (; i != iter_node->count - iter.index; ++i) {
+                new (&reinterpret_cast<T*>(iter_node->data)[iter_node->count - i]) T(reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1]);
+                reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1].~T();
+            }
+            new (&*iter) T(value);
+            ++size_;
+            ++iter_node->count;
+        } catch (...) {
+            for (size_type j = 0; j != i; ++j) {
+                reinterpret_cast<T*>(static_cast<node*>(iter.node)->data)[static_cast<node*>(iter.node)->count - i].~T();
+            }
+            std::copy(buffer, buffer + sizeof(T) * NodeMaxSize, static_cast<node*>(iter.node)->data);
+            throw;
         }
-        node* iter_node = static_cast<node*>(iter.node);
-        for (size_type i = 0; i != iter_node->count - iter.index; ++i) {
-            new (&reinterpret_cast<T*>(iter_node->data)[iter_node->count - i]) T(reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1]);
-            reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1].~T();
-        }
-        ++size_;
-        new (&*iter) T(value);
-        // *iter = value;
-        ++iter_node->count;
         return iter;
     }
     iterator insert(const_iterator const_iter, size_type n, const T& value) {
@@ -317,28 +323,27 @@ public:
         return copy;
     }
 
-    iterator erase(const_iterator const_iter) {
+    iterator erase(const_iterator const_iter) {  // add strong garantee
         if (const_iter == end() || (const_iter == begin() && size_ == 0)) return end();
         iterator iter = {const_iter.node, const_iter.index};
         node* casted_node = static_cast<node*>(iter.node);
-        // std::cout << "Debug the node: " << casted_node->count << " totals and iter " << iter.index << '\n';
         for (size_type i = iter.index; i != casted_node->count; ++i) {
             if (i != iter.index) {
-                // std::cout << "\t" << casted_node->count << ' ' << i << ' ' << size() << '\n';
                 new (&reinterpret_cast<T*>(casted_node->data)[i - 1]) T(reinterpret_cast<T*>(casted_node->data)[i]);
             }
             reinterpret_cast<T*>(casted_node->data)[i].~T();
         }
-        --size_;
-        if (--casted_node->count == iter.index) { --iter.index; }
-        if (casted_node->count == 0) { deallocate_node(iter); }
+        --size_; --casted_node->count;
+        if (casted_node->count == 0) deallocate_node(iter);
+        else if (casted_node->count == iter.index) {
+            iter.node = iter.node->next;
+            iter.index = 0;
+        }
         return iter;
     }
     iterator erase(const_iterator begin, const_iterator end) {
         iterator iter = {begin.node, begin.index};
-        while (iter != end && iter != end()) {
-            iter = erase(iter);
-        }
+        while (iter != end && iter != end()) { iter = erase(iter); }
         return iter;
     }
 
