@@ -250,13 +250,14 @@ private:
     void deallocate_node(iterator& iter) {
         /// the problem: we dont deallocate the begin node at the start, becausee that was the meaning of the action, but there is a problem
         /// if we dont delete it, we will have a empty begin.. must to correct that.
-        std::cout << "run node deallocating...\n";
-        if (iter.node == begin_) { return; }
+        // std::cout << "run node deallocating...\n";
+        if (iter.node == begin_ && size_ == 0) { return; }
+        if (iter.node == begin_) { begin_ = iter.node->next; }
         iter.node->prev->next = iter.node->next;
         iter.node->next->prev = iter.node->prev;
         sentinel_node* next_node = iter.node->next;
         std::allocator_traits<node_allocator_type>::destroy(node_allocator, static_cast<node*>(iter.node));
-        std::cout << "have a problem there: \n";
+        // std::cout << "have a problem there: \n";
         std::allocator_traits<node_allocator_type>::deallocate(node_allocator, static_cast<node*>(iter.node), 1);
         iter.node = next_node;
     }
@@ -276,9 +277,10 @@ public:
             new (&reinterpret_cast<T*>(iter_node->data)[iter_node->count - i]) T(reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1]);
             reinterpret_cast<T*>(iter_node->data)[iter_node->count - i - 1].~T();
         }
-        *iter = value;
-        ++iter_node->count;
         ++size_;
+        new (&*iter) T(value);
+        // *iter = value;
+        ++iter_node->count;
         return iter;
     }
     iterator insert(const_iterator const_iter, size_type n, const T& value) {
@@ -319,17 +321,17 @@ public:
         if (const_iter == end() || (const_iter == begin() && size_ == 0)) return end();
         iterator iter = {const_iter.node, const_iter.index};
         node* casted_node = static_cast<node*>(iter.node);
-        std::cout << "Debug the node: " << casted_node->count << " totals and iter " << iter.index << '\n';
+        // std::cout << "Debug the node: " << casted_node->count << " totals and iter " << iter.index << '\n';
         for (size_type i = iter.index; i != casted_node->count; ++i) {
             if (i != iter.index) {
-                std::cout << "\t" << casted_node->count << ' ' << i << ' ' << size() << '\n';
+                // std::cout << "\t" << casted_node->count << ' ' << i << ' ' << size() << '\n';
                 new (&reinterpret_cast<T*>(casted_node->data)[i - 1]) T(reinterpret_cast<T*>(casted_node->data)[i]);
             }
             reinterpret_cast<T*>(casted_node->data)[i].~T();
         }
-        if (casted_node->count - 1 == iter.index) { --iter.index; }
-        if (--casted_node->count == 0) { deallocate_node(iter); }
         --size_;
+        if (--casted_node->count == iter.index) { --iter.index; }
+        if (casted_node->count == 0) { deallocate_node(iter); }
         return iter;
     }
     iterator erase(const_iterator begin, const_iterator end) {
@@ -355,5 +357,5 @@ public:
     void push_front(const T& value) { insert(begin(), value); }
 
     void pop_front() { erase(begin()); }
-    void pop_back() { erase(--end()); }  // trouble!
+    void pop_back() { erase(--end()); }
 };
