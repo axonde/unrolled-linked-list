@@ -147,7 +147,6 @@ Unrolled linked lists generally outperform traditional linked lists for traversa
 | Iterate   | O(n)           | Much faster            |
 
 \* Amortized time complexity assuming the location is known
-`n` - count of elements;
 
 ## Contributing
 
