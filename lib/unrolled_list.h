@@ -5,10 +5,6 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include <iostream>
-
-#include <vector>
-
 template<typename T, size_t NodeMaxSize = 10, typename Allocator = std::allocator<T>>
 class unrolled_list {
     static_assert(NodeMaxSize > 0, "NodeMaxSize must be greater than zero");
@@ -64,11 +60,11 @@ private:
         list_iterator(sentinel_node* n, size_t i) : node(n), index(i) {}
 
     public:
-        conditional<isConst, const_reference, reference>::type operator*() const {
+        typename conditional<isConst, const_reference, reference>::type operator*() const {
             if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
             return reinterpret_cast<T*>(static_cast<struct node*>(node)->data)[index];
         }
-        conditional<isConst, const_pointer, pointer>::type operator->() const {
+        typename conditional<isConst, const_pointer, pointer>::type operator->() const {
             if (node->is_sentinel) { throw std::invalid_argument("cannot dereference a no-value iterator"); }
             return reinterpret_cast<T*>(static_cast<struct node*>(node)->data) + index;
         }
@@ -118,7 +114,7 @@ private:
     };
 
     using sentinel_node_allocator_type = std::allocator<sentinel_node>;
-    using node_allocator_type = std::allocator_traits<Allocator>::template rebind_alloc<node>;
+    using node_allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<node>;
     sentinel_node_allocator_type sentinel_node_allocator;
     node_allocator_type node_allocator;
     allocator_type allocator;
@@ -335,7 +331,7 @@ public:
         return copy;
     }
 
-    iterator erase(const_iterator const_iter) {  // TODO: add strong garantee
+    iterator erase(const_iterator const_iter) {
         if (const_iter == end() || (const_iter == begin() && size_ == 0)) return end();
         iterator iter = {const_iter.node, const_iter.index};
 

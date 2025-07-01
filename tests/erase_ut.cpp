@@ -31,7 +31,7 @@ TEST(Erases, EraseAdvancedOneNodeFront) {
     ASSERT_EQ(list.size(), 0);
 }
 
-TEST(Erases, EraseAdvancedBackward) {  // have a big problem here.
+TEST(Erases, EraseAdvancedBackward) {
     unrolled_list<int, 5> list = {1, 2, 3, 4, 5, 6};
     auto iter = --list.end();
     for (; iter != list.begin(); ) {
