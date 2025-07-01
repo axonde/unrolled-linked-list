@@ -15,7 +15,21 @@ An unrolled linked list is a data structure that combines the advantages of arra
 - Faster traversal while maintaining O(1) insertion and deletion
 - Better memory usage patterns for modern CPU architectures
 
-![Unrolled Linked List Structure](https://raw.githubusercontent.com/axonde/unrolled-linked-list/main/docs/images/unrolled_list_diagram.png)
+```
++---------------------------------------------------+
+|                Unrolled Linked List               |
++---------------------------------------------------+
+
++---------------+        +---------------+        +---------------+
+| Node 1        |        | Node 2        |        | Node 3        |
+|               |        |               |        |               |
+| +-----------+ | next   | +-----------+ | next   | +-----------+ |
+| | [5][7][9] | |------->| | [2][4][8] | |------->| | [1][3][6] | |
+| +-----------+ |        | +-----------+ |        | +-----------+ |
+|               |<-------|               |<-------|               |
+|     prev      | prev   |     prev      | prev   |     prev      |
++---------------+        +---------------+        +---------------+
+```
 
 ## Features
 
@@ -133,6 +147,7 @@ Unrolled linked lists generally outperform traditional linked lists for traversa
 | Iterate   | O(n)           | Much faster            |
 
 \* Amortized time complexity assuming the location is known
+`n` - count of elements;
 
 ## Contributing
 
