@@ -50,8 +50,8 @@ This is a header-only library. Simply include the header file in your project:
 
 ### Requirements
 
-- C++17 compatible compiler
-- CMake 3.14 or higher (for building tests and examples)
+- C++20 compatible compiler
+- CMake 3.12 or higher (for building tests and examples)
 
 ### Building Examples and Tests
 
